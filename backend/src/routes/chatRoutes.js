@@ -68,13 +68,21 @@ export function setupChat(io) {
             });
           } else {
             // All done
-            await savePatientData(patient);
-            notifyDoctor(patient);
-            await scheduleConsult(patient);
-            socket.emit("chat", {
-              sender: "assistant",
-              text: "Thank you! Your consult is scheduled. The doctor will contact you soon.",
-            });
+            try {
+              await savePatientData(patient);
+              notifyDoctor(patient);
+              await scheduleConsult(patient);
+              socket.emit("chat", {
+                sender: "assistant",
+                text: "Thank you! Your consult is scheduled. The doctor will contact you soon.",
+              });
+            } catch (error) {
+              console.error("Error processing patient data:", error);
+              socket.emit("chat", {
+                sender: "assistant",
+                text: "There was an error scheduling your consult. Please contact support.",
+              });
+            }
             step++;
           }
         }
