@@ -1,6 +1,8 @@
 import { scheduleConsult } from "../services/calendarService.js";
 import { getFollowUpQuestions } from "../db/symptomRuleDb.js";
 import { savePatient } from "../services/patientService.js";
+import { notifyDoctor } from "../services/telegramService.js";
+import { closingMessage, rephraseQuestion } from "../services/llmService.js";
 
 export function setupChat(io) {
   io.on("connection", (socket) => {
@@ -46,20 +48,38 @@ export function setupChat(io) {
             step = -1; // Consultation done
           }
         } else if (step >= 3) {
-          // Collect follow-up answers
           const question = followUpQuestions[currentQuestionIndex];
-          patient.follow_ups[question] = msg;
+
+          // Store answer grouped by symptom
+          const currentSymptom = patient.symptoms[0];
+          if (!patient.follow_ups[currentSymptom]) {
+            patient.follow_ups[currentSymptom] = [];
+          }
+          patient.follow_ups[currentSymptom].push(msg);
 
           currentQuestionIndex++;
 
           if (currentQuestionIndex < followUpQuestions.length) {
+            // 👇 Rephrase the next question using LLM
+            const rawNextQ = followUpQuestions[currentQuestionIndex];
+            const friendlyNextQ = await rephraseQuestion(rawNextQ);
+
             socket.emit("chat", {
               sender: "assistant",
-              text: followUpQuestions[currentQuestionIndex],
+              text: friendlyNextQ,
             });
           } else {
+            // Consultation complete
             await handleConsultation(socket, patient);
-            step = -1; // Consultation done
+
+            // 👇 Use LLM to generate a friendly closing
+            const finalMsg = await closingMessage(patient);
+            socket.emit("chat", {
+              sender: "assistant",
+              text: finalMsg,
+            });
+
+            step = -1;
           }
         }
       } catch (error) {
@@ -76,7 +96,8 @@ export function setupChat(io) {
 async function handleConsultation(socket, patient) {
   try {
     await savePatient(patient);
-    await scheduleConsult(patient);
+    // await scheduleConsult(patient);
+    await notifyDoctor(patient);
     socket.emit("chat", {
       sender: "assistant",
       text: "Thank you! Your consultation has been scheduled. A doctor will contact you soon.",

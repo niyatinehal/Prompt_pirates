@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 import AssistantAvatar from "./components/AssistantAvatar";
 import TimelineChat from "./components/TimelineChat";
 
-const socket = io("http://localhost:5000");
+const socket = io("http://localhost:8081");
 
 function App() {
   const [messages, setMessages] = useState([]);

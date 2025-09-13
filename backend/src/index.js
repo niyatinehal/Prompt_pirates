@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { initDatabase, getDb } from "./db/initDb.js";
 import { setupChat } from "./routes/chatRoutes.js";
+import initSocketService from "./services/socketService.js";
 import apiRouter from "./routes/api.js";
 
 dotenv.config();
@@ -11,6 +12,8 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
+
+initSocketService(io);
 
 app.use(express.json());
 
@@ -32,6 +35,7 @@ app.get("/db/symptoms", async (req, res) => {
   }
 });
 
+// Get all categories
 app.get("/db/categories", async (req, res) => {
   try {
     const db = await getDb();
@@ -42,6 +46,7 @@ app.get("/db/categories", async (req, res) => {
   }
 });
 
+// Get all questions with symptom + category
 app.get("/db/questions", async (req, res) => {
   try {
     const db = await getDb();
