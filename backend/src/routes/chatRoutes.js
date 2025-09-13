@@ -2,6 +2,7 @@ import { scheduleConsult } from "../services/calendarService.js";
 import { getFollowUpQuestions } from "../db/symptomRuleDb.js";
 import { savePatient } from "../services/patientService.js";
 import { notifyDoctor } from "../services/telegramService.js";
+import { closingMessage, rephraseQuestion } from "../services/llmService.js";
 
 export function setupChat(io) {
   io.on("connection", (socket) => {
@@ -49,7 +50,7 @@ export function setupChat(io) {
         } else if (step >= 3) {
           const question = followUpQuestions[currentQuestionIndex];
 
-          // group by symptom instead of question
+          // Store answer grouped by symptom
           const currentSymptom = patient.symptoms[0];
           if (!patient.follow_ups[currentSymptom]) {
             patient.follow_ups[currentSymptom] = [];
@@ -59,12 +60,25 @@ export function setupChat(io) {
           currentQuestionIndex++;
 
           if (currentQuestionIndex < followUpQuestions.length) {
+            // 👇 Rephrase the next question using LLM
+            const rawNextQ = followUpQuestions[currentQuestionIndex];
+            const friendlyNextQ = await rephraseQuestion(rawNextQ);
+
             socket.emit("chat", {
               sender: "assistant",
-              text: followUpQuestions[currentQuestionIndex],
+              text: friendlyNextQ,
             });
           } else {
+            // Consultation complete
             await handleConsultation(socket, patient);
+
+            // 👇 Use LLM to generate a friendly closing
+            const finalMsg = await closingMessage(patient);
+            socket.emit("chat", {
+              sender: "assistant",
+              text: finalMsg,
+            });
+
             step = -1;
           }
         }
