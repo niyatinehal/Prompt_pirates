@@ -46,9 +46,14 @@ export function setupChat(io) {
             step = -1; // Consultation done
           }
         } else if (step >= 3) {
-          // Collect follow-up answers
           const question = followUpQuestions[currentQuestionIndex];
-          patient.follow_ups[question] = msg;
+
+          // group by symptom instead of question
+          const currentSymptom = patient.symptoms[0];
+          if (!patient.follow_ups[currentSymptom]) {
+            patient.follow_ups[currentSymptom] = [];
+          }
+          patient.follow_ups[currentSymptom].push(msg);
 
           currentQuestionIndex++;
 
@@ -59,7 +64,7 @@ export function setupChat(io) {
             });
           } else {
             await handleConsultation(socket, patient);
-            step = -1; // Consultation done
+            step = -1;
           }
         }
       } catch (error) {
