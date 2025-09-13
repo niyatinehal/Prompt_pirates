@@ -4,12 +4,15 @@ import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { initDatabase, getDb } from "./db/initDb.js";
 import { setupChat } from "./routes/chatRoutes.js";
+import initSocketService from "./services/socketService.js";
 
 dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
+
+initSocketService(io);
 
 app.use(express.json());
 

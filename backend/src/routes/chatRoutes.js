@@ -1,6 +1,7 @@
 import { scheduleConsult } from "../services/calendarService.js";
 import { getFollowUpQuestions } from "../db/symptomRuleDb.js";
 import { savePatient } from "../services/patientService.js";
+import { notifyDoctor } from "../services/telegramService.js";
 
 export function setupChat(io) {
   io.on("connection", (socket) => {
@@ -81,7 +82,8 @@ export function setupChat(io) {
 async function handleConsultation(socket, patient) {
   try {
     await savePatient(patient);
-    await scheduleConsult(patient);
+    // await scheduleConsult(patient);
+    await notifyDoctor(patient);
     socket.emit("chat", {
       sender: "assistant",
       text: "Thank you! Your consultation has been scheduled. A doctor will contact you soon.",
