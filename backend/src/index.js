@@ -4,6 +4,7 @@ import { Server } from "socket.io";
 import dotenv from "dotenv";
 import { initDatabase, getDb } from "./db/initDb.js";
 import { setupChat } from "./routes/chatRoutes.js";
+import apiRouter from "./routes/api.js";
 
 dotenv.config();
 
@@ -13,18 +14,14 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
-// =========================
-// Basic health check
-// =========================
-app.get("/", (req, res) => {
-  res.send("Doctor AI Backend Running 🚀");
-});
+// -------------------------
+// Health check
+// -------------------------
+app.get("/", (req, res) => res.send("Doctor AI Backend Running 🚀"));
 
-// =========================
+// -------------------------
 // Database inspection APIs
-// =========================
-
-// Get all symptoms
+// -------------------------
 app.get("/db/symptoms", async (req, res) => {
   try {
     const db = await getDb();
@@ -35,7 +32,6 @@ app.get("/db/symptoms", async (req, res) => {
   }
 });
 
-// Get all categories
 app.get("/db/categories", async (req, res) => {
   try {
     const db = await getDb();
@@ -46,7 +42,6 @@ app.get("/db/categories", async (req, res) => {
   }
 });
 
-// Get all questions with symptom + category
 app.get("/db/questions", async (req, res) => {
   try {
     const db = await getDb();
@@ -62,7 +57,6 @@ app.get("/db/questions", async (req, res) => {
   }
 });
 
-// Get all critical red-flag questions
 app.get("/db/redflags", async (req, res) => {
   try {
     const db = await getDb();
@@ -79,63 +73,30 @@ app.get("/db/redflags", async (req, res) => {
   }
 });
 
-// =========================
-// New Endpoint: Follow-up Questions by Symptom
-// =========================
-app.get("/api/symptoms/:id/questions", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const db = await getDb();
+// -------------------------
+// Mount Main API Router
+// -------------------------
+app.use("/api", apiRouter); // all routes prefixed with /api
 
-    // Get symptom name
-    const symptom = await db.get(`SELECT name FROM Symptoms WHERE id = ?`, [id]);
-    if (!symptom) {
-      return res.status(404).json({ error: "Symptom not found" });
-    }
-
-    // Fetch follow-up questions grouped by category
-    const rows = await db.all(
-      `
-      SELECT c.name as category, f.question
-      FROM FollowUpQuestions f
-      JOIN Categories c ON f.category_id = c.id
-      WHERE f.symptom_id = ?
-      ORDER BY c.name
-      `,
-      [id]
-    );
-
-    // Group questions into categories
-    const grouped = {};
-    for (const row of rows) {
-      if (!grouped[row.category]) grouped[row.category] = [];
-      grouped[row.category].push(row.question);
-    }
-
-    res.json({
-      symptom: symptom.name,
-      questions: grouped,
-    });
-  } catch (error) {
-    console.error("Error fetching follow-up questions:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// =========================
+// -------------------------
 // Socket Chat Setup
-// =========================
+// -------------------------
 setupChat(io);
 
-const PORT = process.env.PORT || 3001;
-
-initDatabase()
-  .then(() => {
+// -------------------------
+// Start server after DB initialization
+// -------------------------
+async function startServer() {
+  try {
+    await initDatabase(); // Initialize DB first
+    const PORT = process.env.PORT || 3001;
     server.listen(PORT, () => {
       console.log(`✅ Server running on http://localhost:${PORT}`);
     });
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error("❌ Failed to initialize database:", error);
     process.exit(1);
-  });
+  }
+}
+
+startServer();

@@ -23,7 +23,7 @@ export async function initDatabase() {
       driver: sqlite3.Database,
     });
 
-    // Create tables
+    // Create tables (✅ Categories scoped per symptom)
     await db.exec(`
       CREATE TABLE IF NOT EXISTS Symptoms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,7 +32,10 @@ export async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS Categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE
+        symptom_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        UNIQUE(symptom_id, name),
+        FOREIGN KEY (symptom_id) REFERENCES Symptoms(id)
       );
 
       CREATE TABLE IF NOT EXISTS FollowUpQuestions (
@@ -76,16 +79,19 @@ export async function initDatabase() {
         result.lastID ||
         (await db.get(`SELECT id FROM Symptoms WHERE name = ?`, [symptom])).id;
 
-      // Insert categories + questions
+      // Insert categories + questions (✅ scoped per symptom)
       for (const category in follow_up_questions) {
-        // Ensure category exists
+        // Ensure category exists for THIS symptom
         const catResult = await db.run(
-          `INSERT OR IGNORE INTO Categories (name) VALUES (?)`,
-          [category]
+          `INSERT OR IGNORE INTO Categories (symptom_id, name) VALUES (?, ?)`,
+          [symptomId, category]
         );
         const categoryId =
           catResult.lastID ||
-          (await db.get(`SELECT id FROM Categories WHERE name = ?`, [category])).id;
+          (await db.get(
+            `SELECT id FROM Categories WHERE symptom_id = ? AND name = ?`,
+            [symptomId, category]
+          )).id;
 
         // Insert questions
         for (const q of follow_up_questions[category]) {
@@ -94,7 +100,7 @@ export async function initDatabase() {
             [symptomId, categoryId, q]
           );
 
-          // If this is a red_flag category → mark severity as "critical"
+          // If this is a red_flags category → mark severity as "critical"
           if (category.toLowerCase() === "red_flags") {
             const qId =
               qResult.lastID ||
