@@ -13,7 +13,9 @@ const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
+// =========================
 // Basic health check
+// =========================
 app.get("/", (req, res) => {
   res.send("Doctor AI Backend Running 🚀");
 });
@@ -74,6 +76,49 @@ app.get("/db/redflags", async (req, res) => {
     res.json(redFlags);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// =========================
+// New Endpoint: Follow-up Questions by Symptom
+// =========================
+app.get("/api/symptoms/:id/questions", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = await getDb();
+
+    // Get symptom name
+    const symptom = await db.get(`SELECT name FROM Symptoms WHERE id = ?`, [id]);
+    if (!symptom) {
+      return res.status(404).json({ error: "Symptom not found" });
+    }
+
+    // Fetch follow-up questions grouped by category
+    const rows = await db.all(
+      `
+      SELECT c.name as category, f.question
+      FROM FollowUpQuestions f
+      JOIN Categories c ON f.category_id = c.id
+      WHERE f.symptom_id = ?
+      ORDER BY c.name
+      `,
+      [id]
+    );
+
+    // Group questions into categories
+    const grouped = {};
+    for (const row of rows) {
+      if (!grouped[row.category]) grouped[row.category] = [];
+      grouped[row.category].push(row.question);
+    }
+
+    res.json({
+      symptom: symptom.name,
+      questions: grouped,
+    });
+  } catch (error) {
+    console.error("Error fetching follow-up questions:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 
