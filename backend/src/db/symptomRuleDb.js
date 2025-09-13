@@ -1,4 +1,4 @@
-// Symptom Rule DB setup using SQLite
+import { getDb } from './initDb.js';
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,28 +6,21 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const datasetPath = path.resolve(__dirname, "Datasetab94d2b.json");
-let symptomData = null;
 
-function loadSymptomData() {
-  if (!symptomData) {
-    try {
-      const raw = fs.readFileSync(datasetPath, "utf-8");
-      symptomData = JSON.parse(raw);
-    } catch (err) {
-      console.error("Failed to load symptom dataset:", err);
-      symptomData = [];
-    }
-  }
-  return symptomData;
+async function getFollowUpQuestions(symptom) {
+  const db = await getDb();
+  const questions = await db.all(
+    `SELECT question FROM FollowUpQuestions
+     WHERE symptom_id = (SELECT id FROM Symptoms WHERE name = ?)`,
+    [symptom]
+  );
+  return questions.map(q => q.question);
 }
 
-// No DB initialization needed
-export function getAllSymptoms() {
-  return loadSymptomData().map((entry) => entry.symptom);
+async function getAllSymptoms() {
+  const db = await getDb();
+  const symptoms = await db.all('SELECT name FROM Symptoms');
+  return symptoms.map(s => s.name);
 }
 
-export function getFollowUpQuestions(symptom) {
-  const data = loadSymptomData();
-  const entry = data.find((e) => e.symptom === symptom);
-  return entry ? entry.follow_up_questions : [];
-}
+export { getFollowUpQuestions, getAllSymptoms };

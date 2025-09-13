@@ -2,6 +2,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getDb } from './initDb.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,6 +40,22 @@ export function savePatientData({ name, email, symptoms, follow_ups }) {
   patients.push(newEntry);
   fs.writeFileSync(dataFile, JSON.stringify(patients, null, 2));
 }
+
+// New function to save patient data to the database
+export async function savePatient(patientData) {
+  const db = await getDb();
+  try {
+    const result = await db.run(
+      `INSERT INTO Patients (name, email, symptoms) VALUES (?, ?, ?)`,
+      [patientData.name, patientData.email, JSON.stringify(patientData.symptoms)]
+    );
+    return result.lastID;
+  } catch (error) {
+    console.error('Error saving patient:', error);
+    throw error;
+  }
+}
+
 // Optional: get all patient data
 export function getAllPatientData() {
   initPatientDataDb();
